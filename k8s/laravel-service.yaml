@@ -8,15 +8,14 @@ spec:
   type: NodePort
   ports:
     - name: http
-      port: 8080
-      targetPort: 8080
+      port: 80
+      targetPort: 80
       nodePort: 30080
-    - name: ssh
-      port: 22
-      targetPort: 22
-      nodePort: 30022
     - name: mysql
       port: 3306
       targetPort: 3306
       nodePort: 30306
-
+    - name: ssh
+      port: 22
+      targetPort: 22
+      nodePort: 30022
