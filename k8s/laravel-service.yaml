@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: laravel-service
+spec:
+  selector:
+    app: laravel-app
+  type: NodePort
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30080
+    - name: ssh
+      port: 22
+      targetPort: 22
+      nodePort: 30022
+    - name: mysql
+      port: 3306
+      targetPort: 3306
+      nodePort: 30306
+

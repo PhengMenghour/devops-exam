@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laravel-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: laravel-app
+  template:
+    metadata:
+      labels:
+        app: laravel-app
+    spec:
+      containers:
+        - name: web-server
+          image: php:8.2-fpm-alpine
+          ports:
+            - containerPort: 8080
+            - containerPort: 22
+          volumeMounts:
+            - name: www-data
+              mountPath: /var/www/html
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              apk add --no-cache nginx openssh git php-pdo php-mysqli php-zip php-openssl php-curl php-mbstring php-xml php-json php-tokenizer php-fpm;
+              mkdir -p /run/nginx;
+              if [ ! -d /var/www/html ]; then
+                git clone https://github.com/PhengMenghour/DevOps-TP6.git /var/www/html;
+              fi;
+              php-fpm8 && nginx -g 'daemon off;'
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+        - name: mysql
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "Hello@123"
+            - name: MYSQL_DATABASE
+              value: "menghour-db"
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: www-data
+          emptyDir: {}
+        - name: mysql-data
+          emptyDir: {}
