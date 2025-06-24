@@ -14,28 +14,45 @@ spec:
     spec:
       containers:
         - name: web-server
-          image: php:8.2-fpm-alpine
+          image: php:8.2-apache
           ports:
-            - containerPort: 8080
-            - containerPort: 22
+            - containerPort: 80
           volumeMounts:
             - name: www-data
               mountPath: /var/www/html
           command: ["/bin/sh", "-c"]
           args:
             - |
-              apk add --no-cache nginx openssh git php-pdo php-mysqli php-zip php-openssl php-curl php-mbstring php-xml php-json php-tokenizer php-fpm;
-              mkdir -p /run/nginx;
-              if [ ! -d /var/www/html ]; then
-                git clone https://github.com/PhengMenghour/DevOps-TP6.git /var/www/html;
+              apt-get update && apt-get install -y git libzip-dev unzip;
+              docker-php-ext-install pdo pdo_mysql zip;
+              if [ ! -d /var/www/html/.git ]; then
+                git clone -b master https://github.com/PhengMenghour/devops-exam.git /tmp/app;
+                cp -r /tmp/app/* /var/www/html/;
+                rm -rf /tmp/app;
               fi;
-              php-fpm8 && nginx -g 'daemon off;'
+              chown -R www-data:www-data /var/www/html;
+              chmod -R 755 /var/www/html;
+              a2enmod rewrite;
+              echo '<VirtualHost *:80>
+                DocumentRoot /var/www/html/public
+                <Directory /var/www/html/public>
+                  AllowOverride All
+                  Require all granted
+                </Directory>
+              </VirtualHost>' > /etc/apache2/sites-available/000-default.conf;
+              apache2-foreground
           readinessProbe:
             httpGet:
               path: /
-              port: 8080
-            initialDelaySeconds: 10
+              port: 80
+            initialDelaySeconds: 60
             periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 90
+            periodSeconds: 30
         - name: mysql
           image: mysql:8.0
           env:

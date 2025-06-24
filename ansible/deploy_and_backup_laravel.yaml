@@ -1,0 +1,88 @@
+---
+- name: Manage Laravel app in Kubernetes pod
+  hosts: localhost
+  gather_facts: no
+  vars:
+    pod_name: laravel-app-87b46dfd-5xkxh
+    namespace: default
+    web_container: web-server
+    mysql_container: mysql
+    backup_path: /tmp/backup.sql
+
+  tasks:
+    - name: Install git in web-server container if not present
+      kubernetes.core.k8s_exec:
+        namespace: "{{ namespace }}"
+        pod: "{{ pod_name }}"
+        container: "{{ web_container }}"
+        command:
+          - sh
+          - -c
+          - |
+            if ! command -v git >/dev/null; then
+              apt-get update && apt-get install -y git
+            fi
+
+    - name: Git pull latest code in web-server container
+      kubernetes.core.k8s_exec:
+        namespace: "{{ namespace }}"
+        pod: "{{ pod_name }}"
+        container: "{{ web_container }}"
+        command: ["git", "-C", "/var/www/html", "pull"]
+
+    - name: Install composer if missing
+      kubernetes.core.k8s_exec:
+        namespace: "{{ namespace }}"
+        pod: "{{ pod_name }}"
+        container: "{{ web_container }}"
+        command:
+          - sh
+          - -c
+          - |
+            if ! command -v composer >/dev/null; then
+              php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" &&
+              php composer-setup.php --install-dir=/usr/local/bin --filename=composer &&
+              php -r "unlink('composer-setup.php');"
+            fi
+
+    - name: Run composer install
+      kubernetes.core.k8s_exec:
+        namespace: "{{ namespace }}"
+        pod: "{{ pod_name }}"
+        container: "{{ web_container }}"
+        command: ["composer", "install", "--no-interaction", "--prefer-dist", "--optimize-autoloader"]
+
+    - name: Run npm install
+      kubernetes.core.k8s_exec:
+        namespace: "{{ namespace }}"
+        pod: "{{ pod_name }}"
+        container: "{{ web_container }}"
+        command: ["npm", "install", "--prefix", "/var/www/html"]
+
+    - name: Run npm build
+      kubernetes.core.k8s_exec:
+        namespace: "{{ namespace }}"
+        pod: "{{ pod_name }}"
+        container: "{{ web_container }}"
+        command: ["npm", "run", "build", "--prefix", "/var/www/html"]
+
+    - name: Run Laravel tests (SQLite)
+      kubernetes.core.k8s_exec:
+        namespace: "{{ namespace }}"
+        pod: "{{ pod_name }}"
+        container: "{{ web_container }}"
+        command: ["php", "artisan", "test"]
+
+    - name: Backup MySQL database inside mysql container
+      kubernetes.core.k8s_exec:
+        namespace: "{{ namespace }}"
+        pod: "{{ pod_name }}"
+        container: "{{ mysql_container }}"
+        command:
+          - sh
+          - -c
+          - "mysqldump -u root -pHello@123 menghour-db > {{ backup_path }}"
+
+    - name: Copy backup.sql from pod to local machine using kubectl cp
+      ansible.builtin.command: >
+        kubectl cp {{ namespace }}/{{ pod_name }}:{{ backup_path }} ./backup.sql -c {{ mysql_container }}
